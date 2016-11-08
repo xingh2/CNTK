@@ -233,8 +233,6 @@ namespace CNTK
 
         CNTK_API void SetGPUMemoryAllocationTraceLevel(int traceLevel);
 
-        CNTK_API void ForceSynchronousCUDAKernelExecutions();
-
         CNTK_API void ForceDeterministicAlgorithms();
 
         CNTK_API void SetFixedRandomSeed(unsigned long fixedRandomSeed);
