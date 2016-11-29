@@ -65,7 +65,17 @@ def slice(seq, begin_index, end_index, name=''):
     Slice the input sequence.
 
     Examples:
-        TBA
+        >>> x = C.input_variable(shape=(3,2))
+        >>> y = C.sequence.slice(x,1,3)
+        >>> x0 = np.reshape(np.arange(24.0,dtype=np.float32),(4,3,2))
+        >>> y.eval({x:x0})
+        array([[[[  6.,   7.],
+                 [  8.,   9.],
+                 [ 10.,  11.]],
+        <BLANKLINE>
+                [[ 12.,  13.],
+                [ 14.,  15.],
+                [ 16.,  17.]]]], dtype=float32)
     Args:
         seq: sequence input tensor
         begin_index (`int`): the index along sequence axis where the slicing starts
@@ -296,7 +306,14 @@ def reduce_sum(seq, name=''):
     Computes the sum of the input sequence's elements across the sequence axis.
 
     Examples:
-        TBA
+        >>> x = C.input_variable(shape=(3,2))
+        >>> y = C.sequence.reduce_sum(x)
+        >>> x0 = np.reshape(np.arange(24.0,dtype=np.float32),(4,3,2))
+        >>> y.eval({x:x0})
+        array([[[[ 36.,  40.],
+                 [ 44.,  48.],
+                 [ 52.,  56.]]]], dtype=float32)
+
     Args:
         seq: sequence input tensor
         name (`str`, optional): the name of the Function instance in the network
