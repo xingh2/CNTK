@@ -270,6 +270,71 @@ namespace CSEvalV2Example
             }
         }
 
+
+        static void EvaluateUsingCSEvalLib()
+        {
+            // Load the model
+            var model = new CNTK.CSharp.Evaluation();
+
+            model.LoadModel("z.model", DeviceDescriptor.CPUDevice());
+
+            // prepare input for evaluation
+            uint numOfSamples = 1;
+
+            var inputDims = model.GetNodesSize(VariableKind.Input);
+            const string inputNodeName = "features";            
+            
+            ulong numOfInputData = inputDims[inputNodeName];
+            var inputData = new List<float>();
+            for (uint i = 0; i < numOfInputData; ++i)
+            {
+                inputData.Add(i % 255);
+            }
+
+            var inputVector = new FloatVector(inputData);
+            var data = new FloatVectorVector() { inputVector };
+            // Create value directly from data.
+            var inputValue = Value.CreateDenseFloat(inputVar.Shape(), data, DeviceDescriptor.CPUDevice());
+
+            // Create input map
+            // Todo: create a Dictionary wrapper?
+            var inputMap = new UnorderedMapVariableValuePtr();
+            inputMap.Add(inputVar, inputValue);
+
+            // Prepare output
+            const string outputNodeName = "out.z_output";
+            var outputVar = myFunc.Outputs().Where(variable => string.Equals(variable.Name(), outputNodeName)).FirstOrDefault();
+
+            // Create ouput map. Using null as Value to indicate using system allocated memory.
+            var outputMap = new UnorderedMapVariableValuePtr();
+            outputMap.Add(outputVar, null);
+
+            // Evalaute
+            // Todo: test on GPUDevice()?
+            myFunc.Evaluate(inputMap, outputMap, DeviceDescriptor.CPUDevice());
+
+            // Get output value after evaluation
+            var outputValue = outputMap[outputVar];
+            var outputNDArrayView = outputValue.Data();
+
+            var dynamicAxisShape = new global::SizeTVector() { 1, numOfSamples };
+            var outputShape = outputVar.Shape().AppendShape(new NDShape(dynamicAxisShape));
+
+            // Copy the data from the output buffer.
+            // Todo: directly access the data in output buffer if it is on CPU?
+            uint numOfOutputData = outputNDArrayView.Shape().TotalSize();
+            float[] outputData = new float[numOfOutputData];
+            var cpuOutputNDArrayView = new NDArrayView(outputShape, outputData, numOfOutputData, DeviceDescriptor.CPUDevice());
+            cpuOutputNDArrayView.CopyFrom(outputNDArrayView);
+
+            // Output results
+            Console.WriteLine("Evaluation results:");
+            for (uint i = 0; i < numOfOutputData; ++i)
+            {
+                Console.WriteLine(outputData[i]);
+            }
+        }
+
         static void Main(string[] args)
         {
             EvaluateUsingCreateValue();
