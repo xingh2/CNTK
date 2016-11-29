@@ -1484,6 +1484,50 @@ void Matrix<ElemType>::SetUniformRandomMask(const ElemType maskRate, const ElemT
                             NOT_IMPLEMENTED);
 }
 
+// Vanilla SGD update
+template <class ElemType>
+void Matrix<ElemType>::SGDUpdate(Matrix<ElemType>& gradients, double learnRatePerSample)
+{
+    ScaleAndAdd(ElemType(-learnRatePerSample), gradients, *this);
+}
+
+template <class ElemType>
+void Matrix<ElemType>::MomentumSGDUpdate(Matrix<ElemType>& gradients,
+                                         Matrix<ElemType>& smoothedGradients,
+                                         double learnRatePerSample,
+                                         double momentum,
+                                         bool classicMomentum)
+{
+    if (classicMomentum)
+    {
+        ScaleAndAdd(ElemType(-learnRatePerSample), gradients, ElemType(momentum), smoothedGradients);
+        (*this) += smoothedGradients;
+    }
+    else // use unit-gain momentum
+    {
+        smoothedGradients.NormalGrad(gradients, *this, ElemType(learnRatePerSample), ElemType(momentum), false);
+    }
+}
+
+template <class ElemType>
+void Matrix<ElemType>::NesterovAcceleratedMomentumSGDUpdate(Matrix<ElemType>& gradients,
+                                                            Matrix<ElemType>& smoothedGradients,
+                                                            double learnRatePerSample,
+                                                            double momentum,
+                                                            bool classicMomentum)
+{
+    if (classicMomentum)
+    {
+        ScaleAndAdd(ElemType(-momentum), smoothedGradients, *this);
+        ScaleAndAdd(ElemType(-learnRatePerSample), gradients, ElemType(momentum), smoothedGradients);
+        ScaleAndAdd(ElemType(1 + momentum), smoothedGradients, *this);
+    }
+    else // use unit-gain momentum
+    {
+        smoothedGradients.NormalGrad(gradients, *this, ElemType(learnRatePerSample), ElemType(momentum), true);
+    }
+}
+
 template <class ElemType>
 void Matrix<ElemType>::NormalGrad(Matrix<ElemType>& gradients,
                                   Matrix<ElemType>& functionValues,

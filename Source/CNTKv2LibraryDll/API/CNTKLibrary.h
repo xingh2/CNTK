@@ -3241,6 +3241,7 @@ namespace CNTK
     CNTK_API LearnerPtr MomentumSGDLearner(const std::vector<Parameter>& parameters,
                                            const LearningRateSchedule& learningRateSchedule,
                                            const MomentumSchedule& momentumSchedule,
+                                           bool classicMomentum = false,
                                            AdditionalLearningOptions additionalOptions = AdditionalLearningOptions());
 
     ///
@@ -3249,6 +3250,7 @@ namespace CNTK
     CNTK_API LearnerPtr NesterovLearner(const std::vector<Parameter>& parameters,
                                         const LearningRateSchedule& learningRateSchedule,
                                         const MomentumSchedule& momentumSchedule,
+                                        bool classicMomentum = false,
                                         AdditionalLearningOptions additionalOptions = AdditionalLearningOptions());
 
     static MomentumSchedule DefaultVarianceMomentum = MomentumAsTimeConstantSchedule(2 * 3600 * 100);
@@ -3259,6 +3261,7 @@ namespace CNTK
     CNTK_API LearnerPtr AdamLearner(const std::vector<Parameter>& parameters,
                                     const LearningRateSchedule& learningRateSchedule,
                                     const MomentumSchedule& momentumSchedule,
+                                    bool classicMomentum = false,
                                     const MomentumSchedule& varianceMomentumSchedule = DefaultVarianceMomentum,
                                     bool lowMemory = true,
                                     AdditionalLearningOptions additionalOptions = AdditionalLearningOptions());

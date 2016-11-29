@@ -198,8 +198,13 @@ public:
     Matrix<ElemType> Diagonal() const;
     void AssignDiagonalValuesTo(Matrix<ElemType>& diag) const;
 
+    void SGDUpdate(Matrix<ElemType>& gradients, double learnRatePerSample);
+    void MomentumSGDUpdate(Matrix<ElemType>& gradients, Matrix<ElemType>& smoothedGradients, double learnRatePerSample, double momentum, bool classicMomentum = false);
+    void NesterovAcceleratedMomentumSGDUpdate(Matrix<ElemType>& gradients, Matrix<ElemType>& smoothedGradients, double learnRatePerSample, double momentum, bool classicMomentum = false);
+
     // TODO: all these scalars should be passed as doubles and cast down inside
     void NormalGrad(Matrix<ElemType>& gradients, Matrix<ElemType>& functionValues, const ElemType learnRatePerSample, const ElemType momentum, const bool useNAG);
+
     ElemType Adagrad(Matrix<ElemType>& gradients, const bool needAveMultiplier);
     void FSAdagradUpdate(size_t mbSize,
                          Matrix<ElemType>& gradients, Matrix<ElemType>& functionValues, double& smoothedCount,
