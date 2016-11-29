@@ -204,38 +204,22 @@ namespace CSEvalV2Example
             var myFunc = global::Function.LoadModel("01_OneHidden");
 
             // Ouput funciton info.
-            var uid = myFunc.Uid();
-            System.Console.WriteLine("Function id:" + (string.IsNullOrEmpty(uid) ? "(empty)" : uid));
-            var name = myFunc.Name();
-            System.Console.WriteLine("Function Name:" + (string.IsNullOrEmpty(name) ? "(empty)" : name));
-            // Todo: directly return List() or use a wrapper?
-            var argList = myFunc.Arguments().ToList();
-            Console.WriteLine("Function arguments:");
-            foreach (var arg in argList)
-            {
-                Console.WriteLine("    name=" + arg.Name() + ", kind=" + arg.Kind() + ", DataType=" + arg.GetDataType());
-            }
-            var outputList = myFunc.Outputs().ToList();
-            Console.WriteLine("Function outputs:");
-            foreach (var output in outputList)
-            {
-                Console.WriteLine("    name=" + output.Name() + ", kind=" + output.Kind() + ", DataType=" + output.GetDataType());
-            }
+            OutputFunctionInfo(myFunc);
 
             // prepare input for evaluation
             uint numOfSamples = 1;
 
             const string inputNodeName = "features";
-            var inputVar = argList.Where(variable => string.Equals(variable.Name(), inputNodeName)).FirstOrDefault();
+            var inputVar = myFunc.Arguments().Where(variable => string.Equals(variable.Name(), inputNodeName)).FirstOrDefault();
             // Todo: get size directly from inputVar.
-            uint numOfInputData = inputVar.Shape().TotalSize() * numOfSamples;
+            uint numOfInputData = inputVar.Shape().TotalSize();
             var inputData = new List<float>();
             for (uint i = 0; i < numOfInputData; ++i)
             {
                 inputData.Add(i % 255);
             }
 
-            var inputVector = new FloatVector(inputData);
+            var inputVector = new FloatVector(inputData); 
             var data = new FloatVectorVector() {inputVector};
             // Create value directly from data.
             var inputValue = Value.CreateDenseFloat(inputVar.Shape(), data, DeviceDescriptor.CPUDevice());
@@ -247,7 +231,7 @@ namespace CSEvalV2Example
 
             // Prepare output
             const string outputNodeName = "out.z_output";
-            var outputVar = outputList.Where(variable => string.Equals(variable.Name(), outputNodeName)).FirstOrDefault();
+            var outputVar = myFunc.Outputs().Where(variable => string.Equals(variable.Name(), outputNodeName)).FirstOrDefault();
 
             // Create ouput map. Using null as Value to indicate using system allocated memory.
             var outputMap = new UnorderedMapVariableValuePtr();
@@ -283,7 +267,7 @@ namespace CSEvalV2Example
         {
             EvaluateUsingCreateValue();
             //Console.WriteLine("======== Evaluate V1 Model ========");
-            //EvaluateV1ModelUsingNDView();
+            // EvaluateV1ModelUsingNDView();
             //Console.WriteLine("======== Evaluate V2 Model ========");
             //EvaluateV2ModelUsingNDView();
             //Console.WriteLine("======== Evaluate Model Using System Allocated Memory for Output Value ========");
@@ -302,14 +286,14 @@ namespace CSEvalV2Example
             Console.WriteLine("Function arguments:");
             foreach (var arg in argList)
             {
-                Console.WriteLine("    name=" + arg.Name() + ", kind=" + arg.Kind() + ", DataType=" + arg.GetDataType());
+                Console.WriteLine("    name=" + arg.Name() + ", kind=" + arg.Kind() + ", DataType=" + arg.GetDataType() + ", TotalSize=" + arg.Shape().TotalSize());
             }
 
             var outputList = func.Outputs().ToList();
             Console.WriteLine("Function outputs:");
             foreach (var output in outputList)
             {
-                Console.WriteLine("    name=" + output.Name() + ", kind=" + output.Kind() + ", DataType=" + output.GetDataType());
+                Console.WriteLine("    name=" + output.Name() + ", kind=" + output.Kind() + ", DataType=" + output.GetDataType() + ", TotalSize=" + output.Shape().TotalSize());
             }
         }
     }
