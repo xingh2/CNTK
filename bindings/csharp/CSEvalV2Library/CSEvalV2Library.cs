@@ -30,7 +30,9 @@ namespace CNTK.CSharp
             Function.LoadModel(rootFunctionFile, computeDevice);
         }
 
-        public IDictionary<string, IEnumerable<ulong>> GetNodesLayout(VariableKind nodeKind)
+        // Todo: VariableKind contains some more types than just input/output, which could cause some confusions.
+        // We probably want to have a new enum just for input/output
+        public IDictionary<string, IEnumerable<ulong>> GetNodesShape(VariableKind nodeKind)
         {
             var retVal = new Dictionary<string, IEnumerable<ulong>>();
 
@@ -68,6 +70,8 @@ namespace CNTK.CSharp
             return retVal;
         }
 
+        // Todo: VariableKind contains some more types than just input/output, which could cause some confusions.
+        // We probably want to have a new enum just for input/output
         public IDictionary<string, ulong> GetNodesSize(VariableKind nodeKind)
         {
             var retVal = new Dictionary<string, ulong>();
@@ -141,19 +145,45 @@ namespace CNTK.CSharp
 
         // Create Value based on dense input
         // Todo: could this be a extension to Value class??
-        public Value CreateValue<T>(string varName, List<List<T>> data)
+        public Value CreateValue<T>(string varName, List<List<T>> sequences, DeviceDescriptor computeDevice)
         {
             var variable = getVariableByName(varName);
             var inputDim = variable.Shape().TotalSize();
 
-            if (typeof(T).Equals(float))
+            if (typeof(T).Equals(typeof(float)))
             {
-                var inputVector = new FloatVectorVector(inputData);
-            var data = new FloatVectorVector() { inputVector };
-            // Create value directly from data.
-            var inputValue = Value.CreateDenseFloat(inputVar.Shape(), data, DeviceDescriptor.CPUDevice());
+                var inputSeqVector = new FloatVectorVector();
+                foreach (var seq in sequences)
+                {
+                    if (seq.Count() % inputDim != 0)
+                    {
+                        throw new InvalidDataException("the number of data in sequences does not match the input dimension");
+                    }
+                    var samples = new FloatVector(seq);
+                    inputSeqVector.Add(samples);
+                }
+                var inputValue = Value.CreateDenseFloat(variable.Shape(), inputSeqVector, computeDevice);
+                return inputValue;
             }
-            
+            else if (typeof(T).Equals(typeof(double)))
+            {
+                var inputSeqVector = new DoubleVectorVector();
+                foreach (var seq in sequences)
+                {
+                    if (seq.Count() % inputDim != 0)
+                    {
+                        throw new InvalidDataException("the number of data in sequences does not match the input dimension");
+                    }
+                    var samples = new DoubleVector(seq);
+                    inputSeqVector.Add(samples);
+                }
+                var inputValue = Value.CreateDenseDouble(variable.Shape(), inputSeqVector, computeDevice);
+                return inputValue;
+            }
+            else
+            {
+                throw new InvalidDataException("The data type " + typeof(T).ToString() + " is not supported. Only float or double is supported by CNTK.");
+            }
         }
 
         public void Clone()
