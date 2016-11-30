@@ -307,26 +307,35 @@ namespace CSEvalV2Example
             // Todo: test on GPUDevice()?
             model.Evaluate(inputMap, outputMap, DeviceDescriptor.CPUDevice());
 
-            //// Get output value after evaluation
-            //var outputValue = outputMap[outputVar];
-            //var outputNDArrayView = outputValue.Data();
+            var output = new List<List<float>>();
+            var outputDims = model.GetNodesSize(VariableKind.Output);
+            ulong numOfElementsInSample = outputDims[outputNodeName];
 
-            //var dynamicAxisShape = new global::SizeTVector() { 1, numOfSamples };
-            //var outputShape = outputVar.Shape().AppendShape(new NDShape(dynamicAxisShape));
+            model.CopyValueTo<float>(outputNodeName, outputMap[outputNodeName], output);
 
-            //// Copy the data from the output buffer.
-            //// Todo: directly access the data in output buffer if it is on CPU?
-            //uint numOfOutputData = outputNDArrayView.Shape().TotalSize();
-            //float[] outputData = new float[numOfOutputData];
-            //var cpuOutputNDArrayView = new NDArrayView(outputShape, outputData, numOfOutputData, DeviceDescriptor.CPUDevice());
-            //cpuOutputNDArrayView.CopyFrom(outputNDArrayView);
-
-            //// Output results
-            //Console.WriteLine("Evaluation results:");
-            //for (uint i = 0; i < numOfOutputData; ++i)
-            //{
-            //    Console.WriteLine(outputData[i]);
-            //}
+            ulong seqNo = 0;
+            foreach (var seq in output)
+            { 
+                var numOfSamplesInSequence = (ulong)seq.Count/numOfElementsInSample;
+                ulong elementIndex = 0;
+                ulong sampleIndex = 0;
+                Console.Write("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
+                foreach (var data in seq)
+                {
+                    if (elementIndex++ == 0) 
+                    {
+                        Console.Write("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
+                    }
+                    Console.Write(" " + data);
+                    if (elementIndex == numOfElementsInSample)
+                    {
+                        Console.WriteLine(".");
+                        elementIndex = 0;
+                        sampleIndex++;
+                    }
+                }
+                seqNo++;
+            }
         }
 
         static void Main(string[] args)
