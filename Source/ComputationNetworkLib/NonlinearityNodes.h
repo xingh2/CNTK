@@ -574,10 +574,10 @@ struct treeleaf {
 };
 
 template <class ElemType>
-class TreeNode : public ComputationNode<ElemType>, public NumInputs<3>
+class ForestNode : public ComputationNode<ElemType>, public NumInputs<3>
 {
     typedef ComputationNode<ElemType> Base; UsingComputationNodeMembersBoilerplate;
-    static const std::wstring TypeName() { return L"Tree"; }
+    static const std::wstring TypeName() { return L"Forest"; }
 
     Matrix<ElemType> *nodevalue;
     Matrix<long> *leftchild;
@@ -719,13 +719,13 @@ class TreeNode : public ComputationNode<ElemType>, public NumInputs<3>
 
 public:
     //DeclareConstructorFromConfigWithNumInputs(TreeNode);
-    TreeNode(DEVICEID_TYPE deviceId, const wstring& name)
+    ForestNode(DEVICEID_TYPE deviceId, const wstring& name)
         : Base(deviceId, name)
     {
     }
 
-    TreeNode(const ScriptableObjects::IConfigRecordPtr configp)
-        : TreeNode(configp->Get(L"deviceId"), L"<placeholder>")
+    ForestNode(const ScriptableObjects::IConfigRecordPtr configp)
+        : ForestNode(configp->Get(L"deviceId"), L"<placeholder>")
     {
         AttachInputsFromConfig(configp, this->GetExpectedNumInputs()); // (we have none; this checks that none are provided)
         // initialization
@@ -735,7 +735,7 @@ public:
         InitFromFile(inputFile);
     }
 
-    ~TreeNode()
+    ~ForestNode()
     {
         free(treeHead);
         free(featureIdx);
@@ -943,8 +943,8 @@ public:
 
 };
 
-template class TreeNode<float>;
-template class TreeNode<double>;
+template class ForestNode<float>;
+template class ForestNode<double>;
 // -----------------------------------------------------------------------
 // CompareNode(a,b)
 // -----------------------------------------------------------------------

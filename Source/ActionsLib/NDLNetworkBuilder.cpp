@@ -234,17 +234,17 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
             nodePtr = builder.RowRepeat(NULL, num_repeat, name);
         }
     }
-    else if (cnNodeType == OperationNameOf(TreeNode))
+    else if (cnNodeType == OperationNameOf(ForestNode))
     {
         if (parameter.size() != 3)
-            RuntimeError("TreeNode Usage: Tree(origNodeName, fuzzyU, fuzzyB, initFromFilePath="").");
+            RuntimeError("ForestNode Usage: Tree(origNodeName, fuzzyU, fuzzyB, initFromFilePath="").");
 
         nodeParamCount = 1;
         nodeParamStart = 0;
 
         if (pass == ndlPassInitial)
         {
-            nodePtr = builder.Tree(NULL, NULL, NULL, name);
+            nodePtr = builder.Forest(NULL, NULL, NULL, name);
         }
         else if (pass == ndlPassFinal)
         {
@@ -257,7 +257,7 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
             if (!fexists(initFromFilePath))
                 RuntimeError("File pointed to by initFromFilePath does not exist: %s", initFromFilePath.c_str());
 
-            dynamic_pointer_cast<TreeNode<ElemType>>(nodePtr)->InitFromFile(msra::strfun::utf16(initFromFilePath));
+            dynamic_pointer_cast<ForestNode<ElemType>>(nodePtr)->InitFromFile(msra::strfun::utf16(initFromFilePath));
         }
     }
     else if (cnNodeType == OperationNameOf(DiagonalNode))
