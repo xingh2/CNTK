@@ -170,8 +170,6 @@ mkdir -p $baseBinariesPath
 echo "Copying build binaries..." >&3
 cp -r $buildPath/* $baseBinariesPath
 # Remove unnessesary file(s) if exist(s)
-# Remove Py 3.5 for the time being
-rm -f $baseBinariesPath/python/cntk*35*35*.whl
 rm -f $baseBinariesPath/bin/brainscripttests
 rm -f $baseBinariesPath/bin/cppevalclient
 rm -f $baseBinariesPath/bin/evaltests
