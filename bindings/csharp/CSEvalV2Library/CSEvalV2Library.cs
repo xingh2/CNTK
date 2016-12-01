@@ -33,6 +33,7 @@ namespace CNTK.CSharp
 
         // Todo: VariableKind contains some more types than just input/output, which could cause some confusions.
         // We probably want to have a new enum just for input/output
+        // Todo: use ulong, uint or int?
         public IDictionary<string, IEnumerable<ulong>> GetNodesShape(VariableKind nodeKind)
         {
             var retVal = new Dictionary<string, IEnumerable<ulong>>();
@@ -106,7 +107,18 @@ namespace CNTK.CSharp
             return retVal;
         }
 
+        //
+        // Set output Variable
+        //
+        // Todo: inputVariable as ref/out?
+        public void SetEvaluationOutput(List<string> outputVariables, List<string> inputVariables)
+        {
+
+        }
+
         // Todo: set default parameters  = DeviceDescriptor.UseDefaultDevice()
+        // Todo: how to define DeviceDescriptor?? Better just enum or something easier
+        // Todo: use Variable as method, string as extension method.
         public void Evaluate(Dictionary<string, Value> arguments, Dictionary<string, Value> outputs, DeviceDescriptor computeDevice)
         {
             if (rootFunction == null)
@@ -147,6 +159,7 @@ namespace CNTK.CSharp
 
         // Create Value based on dense input
         // Todo: could this be a extension to Value class??
+        // Todo: use Variable instead of varName. VarName as extension method
         public Value CreateValue<T>(string varName, List<List<T>> sequences, DeviceDescriptor computeDevice)
         {
             var variable = getVariableByName(varName);
@@ -187,6 +200,23 @@ namespace CNTK.CSharp
                 throw new InvalidDataException("The data type " + typeof(T).ToString() + " is not supported. Only float or double is supported by CNTK.");
             }
         }
+
+        // Create Value based on sparse input
+        // Todo: could this be a extension to Value class??
+        // Todo: use Variable instead of varName. VarName as extension method
+        public Value CreateValue<T>(string varName, List<T> data, List<int> index, List<int> colIndex, DeviceDescriptor computeDevice)
+        {
+            throw new NotImplementedException("Not implemented");
+        }
+
+        // Create Value based on onehot input
+        // Todo: could this be a extension to Value class??
+        // Todo: use Variable instead of varName. VarName as extension method
+        public Value CreateValue<T>(string varName, List<List<int>> oneHotIndex, DeviceDescriptor computeDevice)
+        {
+            throw new NotImplementedException("Not implemented");
+        }
+
 
         // Copy Value to List<List<T>> for dense input
         // Todo: could this be a extension to Value class??
@@ -258,14 +288,24 @@ namespace CNTK.CSharp
             }
         }
 
-        public void Clone()
+        // Copy Value to List<List<T>> for dense input
+        // Todo: could this be a extension to Value class??
+        public void CopyValueTo<T>(string varName, Value value, List<T> data, List<int> index, List<int> colIndex)
         {
-
+            throw new NotImplementedException("Not implemented");
         }
 
-        private Function rootFunction;
+        public void CopyValueTo<T>(string varName, Value value, List<List<int>> oneHotIndex)
+        {
+            throw new NotImplementedException("Not implemented");
+        }
 
-        private Variable getVariableByName(string name)
+        public Evaluation Clone()
+        {
+            throw new NotImplementedException("Not implemented");
+        }
+
+        public Variable getVariableByName(string name)
         {
             var v = rootFunction.Arguments().Where(variable => string.Equals(variable.Name(), name)).FirstOrDefault();
             if (v == null)
@@ -275,6 +315,8 @@ namespace CNTK.CSharp
 
             return v;
         }
+
+        private Function rootFunction;
 
     }
 }
