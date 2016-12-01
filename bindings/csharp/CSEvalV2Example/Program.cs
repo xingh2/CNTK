@@ -340,13 +340,17 @@ namespace CSEvalV2Example
 
         static void Main(string[] args)
         {
-            EvaluateUsingCreateValue();
+            
             //Console.WriteLine("======== Evaluate V1 Model ========");
             // EvaluateV1ModelUsingNDView();
             //Console.WriteLine("======== Evaluate V2 Model ========");
             //EvaluateV2ModelUsingNDView();
             //Console.WriteLine("======== Evaluate Model Using System Allocated Memory for Output Value ========");
             //EvaluateUsingSystemAllocatedMemory();
+            //Console.WriteLine("======== Evaluate Using Value::Create ========");
+            //EvaluateUsingCreateValue();
+            Console.WriteLine("======== Evaluate Using EvalV2Library ========");
+            EvaluateUsingCSEvalLib();
         }
 
         private static void OutputFunctionInfo(global::Function func)
