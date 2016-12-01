@@ -281,7 +281,7 @@ namespace CSEvalV2Example
             // prepare input for evaluation
             int numOfSamples = 1;
 
-            var inputDims = model.GetNodesSize(VariableKind.Input);
+            var inputDims = model.GetInputSizes();
             const string inputNodeName = "features";
             
             ulong numOfInputData = inputDims[inputNodeName];
@@ -308,7 +308,7 @@ namespace CSEvalV2Example
             model.Evaluate(inputMap, outputMap, DeviceDescriptor.CPUDevice());
 
             var output = new List<List<float>>();
-            var outputDims = model.GetNodesSize(VariableKind.Output);
+            var outputDims = model.GetOutputSizes();
             ulong numOfElementsInSample = outputDims[outputNodeName];
 
             model.CopyValueTo<float>(outputNodeName, outputMap[outputNodeName], output);

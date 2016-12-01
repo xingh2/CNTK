@@ -22,6 +22,7 @@ namespace CNTK.CSharp
             rootFunction = null;
         }
 
+        // Todo: do we need DeviceDecriptor or a simplified version?
         public void LoadModel(string rootFunctionFile, DeviceDescriptor computeDevice)
         {
             if (!File.Exists(rootFunctionFile))
@@ -31,80 +32,26 @@ namespace CNTK.CSharp
             Function.LoadModel(rootFunctionFile, computeDevice);
         }
 
-        // Todo: VariableKind contains some more types than just input/output, which could cause some confusions.
-        // We probably want to have a new enum just for input/output
         // Todo: use ulong, uint or int?
-        public IDictionary<string, IEnumerable<ulong>> GetNodesShape(VariableKind nodeKind)
+        public IDictionary<string, IEnumerable<ulong>> GetInputShapes()
         {
-            var retVal = new Dictionary<string, IEnumerable<ulong>>();
-
-            IEnumerable<Variable> varList;
-            if (nodeKind == VariableKind.Input)
-            {
-                varList = rootFunction.Arguments();
-            }
-            else if (nodeKind == VariableKind.Output)
-            {
-                varList = rootFunction.Outputs();
-            }
-            else 
-            {
-                // Todo: Use nameof after VS2015.
-                throw new ArgumentException("Node kind must be '" + "VariableKind.Input" + "' or '" + "VariableKind.Output" + "'.");
-            }
-
-            foreach (var arg in varList)
-            {
-                if (retVal.ContainsKey(arg.Name()))
-                {
-                    throw new Exception("duplicated name '" + arg.Name() + "'.");
-                }
-                var dim = new List<ulong>();
-                // The Dimensions is IEnumerable<uint>
-                // Todo: fix the swig to output IEnumberable<ulong>
-                foreach (var d in arg.Shape().Dimensions())
-                {
-                    dim.Add(d);
-                }
-                retVal.Add(arg.Name(), dim);
-            }
-
-            return retVal;
+            return GetNodeShapes(VariableKind.Input);
         }
 
-        // Todo: VariableKind contains some more types than just input/output, which could cause some confusions.
-        // We probably want to have a new enum just for input/output
-        // Todo: Size_t to ulong/uint/init?? List.Count is int
-        public IDictionary<string, ulong> GetNodesSize(VariableKind nodeKind)
+        public IDictionary<string, IEnumerable<ulong>> GetOutputShapes()
         {
-            var retVal = new Dictionary<string, ulong>();
+            return GetNodeShapes(VariableKind.Output);
+        }
+        
+        // Todo: Size_t to ulong/uint/init?? List.Count is int
+        public IDictionary<string, ulong> GetInputSizes()
+        {
+            return GetNodeSizes(VariableKind.Input);
+        }
 
-            IEnumerable<Variable> varList;
-            if (nodeKind == VariableKind.Input)
-            {
-                varList = rootFunction.Arguments();
-            }
-            else if (nodeKind == VariableKind.Output)
-            {
-                varList = rootFunction.Outputs();
-            }
-            else 
-            {
-                // Todo: Use nameof after VS2015.
-                throw new ArgumentException("Node kind must be '" + "VariableKind.Input" + "' or '" + "VariableKind.Output" + "'.");
-            }
-
-            foreach (var arg in varList)
-            {
-                if (retVal.ContainsKey(arg.Name()))
-                {
-                    throw new Exception("duplicated name '" + arg.Name() + "'.");
-                }
-
-                retVal.Add(arg.Name(), arg.Shape().TotalSize());
-            }
-
-            return retVal;
+        public IDictionary<string, ulong> GetOutputSizes()
+        {
+            return GetNodeSizes(VariableKind.Output);
         }
 
         //
@@ -160,6 +107,7 @@ namespace CNTK.CSharp
         // Create Value based on dense input
         // Todo: could this be a extension to Value class??
         // Todo: use Variable instead of varName. VarName as extension method
+        // Todo: List can have maximal 2^31-1, enough? Otherwise need to go to array which supports 64bit size
         public Value CreateValue<T>(string varName, List<List<T>> sequences, DeviceDescriptor computeDevice)
         {
             var variable = getVariableByName(varName);
@@ -204,7 +152,7 @@ namespace CNTK.CSharp
         // Create Value based on sparse input
         // Todo: could this be a extension to Value class??
         // Todo: use Variable instead of varName. VarName as extension method
-        public Value CreateValue<T>(string varName, List<T> data, List<int> index, List<int> colIndex, DeviceDescriptor computeDevice)
+        public Value CreateValue<T>(string varName, List<T> data, List<long> index, List<long> colIndex, DeviceDescriptor computeDevice)
         {
             throw new NotImplementedException("Not implemented");
         }
@@ -212,7 +160,7 @@ namespace CNTK.CSharp
         // Create Value based on onehot input
         // Todo: could this be a extension to Value class??
         // Todo: use Variable instead of varName. VarName as extension method
-        public Value CreateValue<T>(string varName, List<List<int>> oneHotIndex, DeviceDescriptor computeDevice)
+        public Value CreateValue<T>(string varName, List<List<long>> oneHotIndex, DeviceDescriptor computeDevice)
         {
             throw new NotImplementedException("Not implemented");
         }
@@ -317,6 +265,76 @@ namespace CNTK.CSharp
         }
 
         private Function rootFunction;
+
+        private IDictionary<string, IEnumerable<ulong>> GetNodeShapes(VariableKind nodeKind)
+        {
+            var retVal = new Dictionary<string, IEnumerable<ulong>>();
+
+            IEnumerable<Variable> varList;
+            if (nodeKind == VariableKind.Input)
+            {
+                varList = rootFunction.Arguments();
+            }
+            else if (nodeKind == VariableKind.Output)
+            {
+                varList = rootFunction.Outputs();
+            }
+            else 
+            {
+                // Todo: Use nameof after VS2015.
+                throw new ArgumentException("Node kind must be '" + "VariableKind.Input" + "' or '" + "VariableKind.Output" + "'.");
+            }
+
+            foreach (var arg in varList)
+            {
+                if (retVal.ContainsKey(arg.Name()))
+                {
+                    throw new Exception("duplicated name '" + arg.Name() + "'.");
+                }
+                var dim = new List<ulong>();
+                // The Dimensions is IEnumerable<uint>
+                // Todo: fix the swig to output IEnumberable<ulong>
+                foreach (var d in arg.Shape().Dimensions())
+                {
+                    dim.Add(d);
+                }
+                retVal.Add(arg.Name(), dim);
+            }
+
+            return retVal;
+        }
+
+        private IDictionary<string, ulong> GetNodeSizes(VariableKind nodeKind)
+        {
+            var retVal = new Dictionary<string, ulong>();
+
+            IEnumerable<Variable> varList;
+            if (nodeKind == VariableKind.Input)
+            {
+                varList = rootFunction.Arguments();
+            }
+            else if (nodeKind == VariableKind.Output)
+            {
+                varList = rootFunction.Outputs();
+            }
+            else
+            {
+                // Todo: Use nameof after VS2015.
+                throw new ArgumentException("Node kind must be '" + "VariableKind.Input" + "' or '" + "VariableKind.Output" + "'.");
+            }
+
+            foreach (var arg in varList)
+            {
+                if (retVal.ContainsKey(arg.Name()))
+                {
+                    throw new Exception("duplicated name '" + arg.Name() + "'.");
+                }
+
+                retVal.Add(arg.Name(), arg.Shape().TotalSize());
+            }
+
+            return retVal;
+        }
 
     }
 }
