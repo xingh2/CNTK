@@ -26,13 +26,15 @@ namespace CSEvalV2Example
             // Load the model.
             Function myFunc = Function.LoadModel("resnet.model");
 
-            // Get the input variable from by name
-            const string inputNodeName = "features";
-            // Todo: provide a help method in Function: getVariableByName()? Or has a property variables which is dictionary of <string, Variable>
-            Variable inputVar = myFunc.Arguments().Where(variable => string.Equals(variable.Name(), inputNodeName)).FirstOrDefault();
+            const string outputNodeName = "out.z_output";
+            Variable outputVar = myFunc.Outputs().Where(variable => string.Equals(variable.Name(), outputNodeName)).FirstOrDefault();
 
-            // Get shape data 
-            NDShape inputShape = inputVar.Shape();
+            // Set desired output variables and get required inputVariables;
+            var inputVariables = new List<Variable>();
+            SetEvaluationOutput(new List<string>() { outputNodeName }, inputVariables);
+
+            // Get shape data for the input variable
+            NDShape inputShape = inputVariables.First().Shape();
             int imageWidth = inputShape[0];
             int imageHeight = inputShape[1];
             int imageChannels = inputShape[2];
@@ -77,8 +79,7 @@ namespace CSEvalV2Example
             // In case of multiple inputs, repeat the steps above for each input.
 
             // Prepare output
-            const string outputNodeName = "out.z_output";
-            Variable outputVar = myFunc.Outputs().Where(variable => string.Equals(variable.Name(), outputNodeName)).FirstOrDefault();
+            
 
             // Create ouput map. Using null as Value to indicate using system allocated memory.
             var outputMap = new Dictionary<Variable, Value>();
