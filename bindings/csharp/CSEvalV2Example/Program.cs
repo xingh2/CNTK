@@ -17,73 +17,6 @@ namespace CSEvalV2Example
 {
     public class Program
     {
-        static void EvaluateUsingCSEvalLib()
-        {
-            // Load the model
-            var model = new CNTK.CSharp.Evaluation();
-
-            model.LoadModel("z.model", DeviceDescriptor.CPUDevice());
-
-            // prepare input for evaluation
-            int numOfSamples = 1;
-
-            var inputDims = model.GetInputSizes();
-            const string inputNodeName = "features";
-
-            ulong numOfInputData = inputDims[inputNodeName];
-            var inputData = new List<List<float>>(numOfSamples);
-            for (uint i = 0; i < numOfInputData; ++i)
-            {
-                inputData[0].Add(i % 255);
-            }
-
-            var inputValue = model.CreateValue<float>(inputNodeName, inputData, DeviceDescriptor.CPUDevice());
-
-            // Create input map
-            // Todo: create a Dictionary wrapper?
-            var inputMap = new Dictionary<string, Value>() { { inputNodeName, inputValue } };
-
-            // Prepare output
-            const string outputNodeName = "out.z_output";
-
-            // Create ouput map. Using null as Value to indicate using system allocated memory.
-            var outputMap = new Dictionary<string, Value>() { { outputNodeName, null } };
-
-            // Evalaute
-            // Todo: test on GPUDevice()?
-            model.Evaluate(inputMap, outputMap, DeviceDescriptor.CPUDevice());
-
-            var output = new List<List<float>>();
-            var outputDims = model.GetOutputSizes();
-            ulong numOfElementsInSample = outputDims[outputNodeName];
-
-            model.CopyValueTo<float>(outputNodeName, outputMap[outputNodeName], output);
-
-            ulong seqNo = 0;
-            foreach (var seq in output)
-            {
-                var numOfSamplesInSequence = (ulong)seq.Count / numOfElementsInSample;
-                ulong elementIndex = 0;
-                ulong sampleIndex = 0;
-                Console.Write("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
-                foreach (var data in seq)
-                {
-                    if (elementIndex++ == 0)
-                    {
-                        Console.Write("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
-                    }
-                    Console.Write(" " + data);
-                    if (elementIndex == numOfElementsInSample)
-                    {
-                        Console.WriteLine(".");
-                        elementIndex = 0;
-                        sampleIndex++;
-                    }
-                }
-                seqNo++;
-            }
-        }
-
         //
         // The example shows how to prepare data based on dense input and get results as dense output.
         // The input data contains multiple sequences and each sequence contains multiple samples.
@@ -100,46 +33,48 @@ namespace CSEvalV2Example
 
             // Get shape data 
             NDShape inputShape = inputVar.Shape();
-            uint imageWidth = inputShape[0];
-            uint imageHeight = inputShape[1];
-            uint imageChannels = inputShape[2];
-            uint imageSize = inputShape.TotalSize();
+            int imageWidth = inputShape[0];
+            int imageHeight = inputShape[1];
+            int imageChannels = inputShape[2];
+            int imageSize = inputShape.TotalSize();
 
             // Number of sequences for this batch
-            uint numOfSequences = 2;
+            int numOfSequences = 2;
             // Number of samples in each sequence
-            uint[] numOfSamplesInSequence = { 4, 2 };
+            int[] numOfSamplesInSequence = { 4, 2 };
 
-            // inputData contains all inputs for the evaluation
+            // inputData contains mutliple sequences. Each sequence has multiple samples.
+            // Each sample has the same tensor shape.
+            // The outer List is the sequences. Its size is numOfSequences.
             // The inner List is the inputs for one sequence. Its size is inputShape.TotalSize() * numberOfSampelsInSequence
-            // The outer List is the sequences. Its size is numOfSequences; 
             var inputData = new List<List<float>>();
             var fileList = new List<string>() { "zebra.jpg", "tiger.jpg", "deer.jpg", "pig.jpg", "buidling.jpg", "garden.jpg" };
             int fileIndex = 0;
-            for (uint seqIndex = 0; seqIndex < numOfSequences; seqIndex++)
+            for (int seqIndex = 0; seqIndex < numOfSequences; seqIndex++)
             {
-                // Input data for the sequence
+                // Create a new data buffer for the new sequence
                 var seqData = new List<float>();
-                for (uint sampleIndex = 0; sampleIndex < numOfSamplesInSequence[seqIndex]; sampleIndex++)
+                for (int sampleIndex = 0; sampleIndex < numOfSamplesInSequence[seqIndex]; sampleIndex++)
                 {
                     Bitmap bmp = new Bitmap(Bitmap.FromFile(fileList[fileIndex++]));
                     var resized = bmp.Resize(imageWidth, imageHeight, true);
                     List<float> resizedCHW = resized.ParallelExtractCHW();
-                    // Add this sample to the list
+                    // Aadd this sample to the data buffer of this sequence
                     seqData.AddRange(resizedCHW);
                 }
-                // Add this sequence to the list
+                // Add this sequence to the sequences list
                 inputData.Add(seqData);
             }
 
             // Create value object from data.
+            // void Create<T>(Shape shape, List<List<T>> data, DeviceDescriptor computeDevice)
             Value inputValue = Value.Create<float>(inputVar.Shape(), inputData, DeviceDescriptor.CPUDevice);
 
             // Create input map
             var inputMap = new Dictionary<Variable, Value>();
             inputMap.Add(inputVar, inputValue);
 
-            // Repeat the steps above for each input.
+            // In case of multiple inputs, repeat the steps above for each input.
 
             // Prepare output
             const string outputNodeName = "out.z_output";
@@ -157,6 +92,7 @@ namespace CSEvalV2Example
             var outputData = new List<List<float>>();
             Value outputVal = outputMap[outputVar];
             // Get output result as dense output
+            // void CopyTo(List<List<T>>
             outputVal.CopyTo(outputData);
 
             // Output results
@@ -190,6 +126,7 @@ namespace CSEvalV2Example
         // 
         // The example uses OneHot vector as input and output for evaluation
         // The input data contains multiple sequences and each sequence contains multiple samples.
+        // There is only one non-zero value in each sample, so the sample can be represented by the index of this non-zero value
         //
         static void OneHoteExample()
         {
@@ -202,7 +139,7 @@ namespace CSEvalV2Example
             Variable inputVar = myFunc.Arguments().Where(variable => string.Equals(variable.Name(), inputNodeName)).FirstOrDefault();
             // Todo: get size directly from inputVar.
             NDShape inputShape = inputVar.Shape();
-            uint inputSize = inputShape.TotalSize();
+            int inputSize = inputShape.TotalSize();
 
             // The number of sequences in this batch
             int numOfSequences = 2;
@@ -234,7 +171,8 @@ namespace CSEvalV2Example
             }
 
             // Create the Value representing the data.
-            Value inputValue = Value.Create<float>(inputVar.Shape(), inputData, DeviceDescriptor.CPUDevice);
+            // void CreateValue<T>(long vocabularySize, List<List<long> oneHotIndexes, DeviceDescriptor computeDevice) 
+            Value inputValue = Value.Create<float>(inputVar.Shape().TotalSize(), inputData, DeviceDescriptor.CPUDevice);
 
             // Create input map
             var inputMap = new Dictionary<Variable, Value>();
@@ -256,6 +194,7 @@ namespace CSEvalV2Example
             Value outputVal = outputMap[outputVar];
 
             // Get output as onehot vector
+            // void CopyTo(List<List<long>>)
             outputVal.CopyTo(outputData);
             Debug.Assert(outputVar.Shape().Rank() == 1);
             var numOfElementsInSample = outputVar.Shape().TotalSize();
@@ -277,8 +216,11 @@ namespace CSEvalV2Example
         }
 
         // 
-        // The example uses OneHot vector as input and output for evaluation
+        // The example uses sparse input and output for evaluation
         // The input data contains multiple sequences and each sequence contains multiple samples.
+        // Each sample is a n-dimensional tensor. For sparse input, the n-dimensional tensor needs 
+        // to be flatted into 1-dimensional vector and the index of non-zero values in the 1-dimensional vector
+        // is used as sparse input.
         //
         static void SparseExample()
         {
@@ -292,15 +234,15 @@ namespace CSEvalV2Example
 
             // Get shape data 
             NDShape inputShape = inputVar.Shape();
-            uint imageWidth = inputShape[0];
-            uint imageHeight = inputShape[1];
-            uint imageChannels = inputShape[2];
-            uint imageSize = inputShape.TotalSize();
+            int imageWidth = inputShape[0];
+            int imageHeight = inputShape[1];
+            int imageChannels = inputShape[2];
+            int imageSize = inputShape.TotalSize();
 
             // Number of sequences for this batch
-            uint numOfSequences = 2;
+            int numOfSequences = 2;
             // Number of samples in each sequence
-            uint[] numOfSamplesInSequence = { 4, 2 };
+            int[] numOfSamplesInSequence = { 4, 2 };
 
             // inputData contains all inputs for the evaluation
             // The inner List is the inputs for one sequence. Its size is inputShape.TotalSize() * numberOfSampelsInSequence
@@ -308,19 +250,22 @@ namespace CSEvalV2Example
             var dataOfSequences = new List<List<float>>();
             var indexOfSequences = new List<List<long>>();
             var nnzCountOfSequences = new List<List<long>>();
+            // Assuming the images to be evlauated are quite sparse so using sparse input is a better option than dense input.
             var fileList = new List<string>() { "zebra.jpg", "tiger.jpg", "deer.jpg", "pig.jpg", "buidling.jpg", "garden.jpg" };
             int fileIndex = 0;
-            for (uint seqIndex = 0; seqIndex < numOfSequences; seqIndex++)
+            for (int seqIndex = 0; seqIndex < numOfSequences; seqIndex++)
             {
                 // Input data for the sequence
                 var dataList = new List<float>();
                 var indexList = new List<long>();
                 var nnzCountList = new List<long>();
-                for (uint sampleIndex = 0; sampleIndex < numOfSamplesInSequence[seqIndex]; sampleIndex++)
+                for (int sampleIndex = 0; sampleIndex < numOfSamplesInSequence[seqIndex]; sampleIndex++)
                 {
                     Bitmap bmp = new Bitmap(Bitmap.FromFile(fileList[fileIndex++]));
                     var resized = bmp.Resize(imageWidth, imageHeight, true);
                     List<float> resizedCHW = resized.ParallelExtractCHW();
+                    // For any n-dimensional tensor, it needs first to be flatted to 1-dimension.
+                    // The index in the sparse input refers to the position in the flatted 1-dimension vector.
                     long nnzCount = 0;
                     long index = 0;
                     foreach (var v in resizedCHW)
@@ -345,6 +290,7 @@ namespace CSEvalV2Example
             }
 
             // Create value object from data.
+            // void Create<T>(Shape shape, List<List<T>> data, List<List<long> indexes, List<List<long>> nnzCounts, DeviceDescriptor computeDevice) 
             Value inputValue = Value.Create<float>(inputVar.Shape(), dataOfSequences, indexOfSequences, nnzCountOfSequences, DeviceDescriptor.CPUDevice);
 
             // Create input map
@@ -372,6 +318,7 @@ namespace CSEvalV2Example
 
             Value outputVal = outputMap[outputVar];
             // Get output result as dense output
+            // CopyTo(List<List<T>> data, List<List<long> indexes, List<List<long>> nnzCounts)
             outputVal.CopyTo(outputData, outputIndex, outputNnzCount);
             var outputShape = outputVar.Shape();
 
@@ -383,36 +330,19 @@ namespace CSEvalV2Example
                 var dataList = outputData[seqIndex];
                 var indexList = outputIndex[seqIndex];
                 var nnzCountList = outputIndex[seqIndex];
-
-                long index = 0;
+                int index = 0;
                 for (int sampleIndex = 0; sampleIndex < nnzCountList.Count; sampleIndex++)
                 {
-                    var nnzCount = nnzCountList[sampleIndex];
-                    for (long i = 0; i < nnzCount; i++)
+                    int elementIndex = 0;
+                    Console.WriteLine("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
+                    Console.Write("   Element " + elementIndex + ":");
+                    for (int c=0; c < nnzCountList[c]; c++)
                     {
-                        indexToRank();
-
+                        Console.Write("[" + indexList[index] + "]=" + dataList[index] + ", ");
+                        index++;
                     }
-
-                }
-                ulong elementIndex = 0;
-                ulong sampleIndex = 0;
-                Console.Write("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
-                foreach (var data in seq)
-                {
-                    // a new sample starts.
-                    if (elementIndex++ == 0)
-                    {
-                        Console.Write("Seq=" + seqNo + ", Sample=" + sampleIndex + ":");
-                    }
-                    Console.Write(" " + data);
-                    // reach the end of a sample.
-                    if (elementIndex == numOfElementsInSample)
-                    {
-                        Console.WriteLine(".");
-                        elementIndex = 0;
-                        sampleIndex++;
-                    }
+                    elementIndex++;
+                    Console.WriteLine(".");
                 }
                 seqNo++;
             }
@@ -429,30 +359,7 @@ namespace CSEvalV2Example
             //EvaluateUsingSystemAllocatedMemory();
         }
 
-        private List<long> IndexToDimensions(long index, NDShape shape)
-        {
-            var ranks = shape.Rank();
-            long count = index;
-            var dims = new List<long>();
-            for (uint r=0 ; r < ranks; r++)
-            {
-                dims[r] = count % shape[r];
-                count = count / shape[r];
-            }
-        }
-
-        private long RankToIndex(NDShape shape, List<long> dimensions)
-        {
-            long index = 0;
-            var ranks = shape.Rank();
-            long count;
-            for (int r = 0; r < ranks; r++)
-            {
-                count = r == 0 ? 1 : count = count * shape[r - 1];
-                index += count * dimensions[r];
-            }
-        }
-
+       
         private static void OutputFunctionInfo(global::Function func)
         {
             var uid = func.Uid();
