@@ -152,7 +152,7 @@ namespace CNTK.CSharp
         // Create Value based on sparse input
         // Todo: could this be a extension to Value class??
         // Todo: use Variable instead of varName. VarName as extension method
-        public Value CreateValue<T>(string varName, List<T> data, List<long> index, List<long> colIndex, DeviceDescriptor computeDevice)
+        public Value CreateValue<T>(string varName, List<T> data, List<List<long>> index, DeviceDescriptor computeDevice)
         {
             throw new NotImplementedException("Not implemented");
         }
