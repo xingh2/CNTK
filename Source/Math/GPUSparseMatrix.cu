@@ -165,6 +165,10 @@ void GPUSparseMatrix<ElemType>::SetValue(const CPUSparseMatrix<ElemType>& deepCo
     {
         SetMatrixFromCSCFormat(deepCopy.ColLocation(), deepCopy.RowLocation(), deepCopy.Data(), deepCopy.GetNumElemAllocated(), deepCopy.GetNumRows(), deepCopy.GetNumCols());
     }
+    else if (deepCopy.GetFormat() == matrixFormatSparseBlockCol)
+    {
+        SetMatrixFromSBCFormat(deepCopy.BlockIdsLocation(), deepCopy.Data(), deepCopy.BlockSize(), deepCopy.GetNumRows(), deepCopy.GetNumCols());
+    }
     else
         NOT_IMPLEMENTED;
 }
@@ -944,6 +948,42 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
             CUDA_CALL(cudaMemcpy(RowLocation(), pRow, sizeof(GPUSPARSE_INDEX_TYPE) * nz, kind));
             CUDA_CALL(cudaMemcpy(ColLocation(), pCol, sizeof(GPUSPARSE_INDEX_TYPE) * (numCols + 1), kind));
         }
+    }
+}
+
+template <class ElemType>
+void GPUSparseMatrix<ElemType>::SetMatrixFromSBCFormat(const size_t* blockIds, const ElemType* val, const size_t numBlocks, const size_t numRows, const size_t numCols,
+    const bool IsOnDevice /*= false*/, const DEVICEID_TYPE devId /*= -1*/, DataTransferer* transferer /*= nullptr*/)
+{
+    VerifyWritable(__FUNCTION__);
+
+    if (blockIds == nullptr || val == nullptr)
+        LogicError("SetMatrixFromSBCFormat: nullptr passed in.");
+
+    SetComputeDeviceId(PrepareDevice(devId));
+    SetFormat(matrixFormatSparseBlockCol);
+
+    size_t nz = numBlocks * numRows;
+    RequireSizeAndAllocate(numRows, numCols, nz, true, false);
+
+    if (transferer && IsOnDevice)
+        RuntimeError("Currently it is prohibited to copy data asynchronous from device to device.");
+
+    cudaMemcpyKind kind = IsOnDevice ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice;
+    if (transferer)
+    {
+        // TODO: All RequireSizeAndAllocate should be async and use a transferer.
+        // Currently there are some memset operations that can be still executing on the default stream,
+        // Here we have to wait for them to finish.
+        transferer->RecordComputeStreamSyncPoint();
+        transferer->WaitForSyncPointOnAssignStreamAsync();
+        transferer->CopyCPUToGPUAsync(val, nz, sizeof(ElemType), Data());
+        transferer->CopyCPUToGPUAsync(blockIds, numBlocks, sizeof(size_t), BlockId2ColOrRow());
+    }
+    else
+    {
+        CUDA_CALL(cudaMemcpy(Data(), val, nz * sizeof(ElemType), kind));
+        CUDA_CALL(cudaMemcpy(BlockId2ColOrRow(), blockIds, numBlocks * sizeof(size_t), kind));
     }
 }
 

@@ -645,6 +645,20 @@ void CPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
 }
 
 template <class ElemType>
+void CPUSparseMatrix<ElemType>::SetMatrixFromSBCFormat(const size_t* blockIds, const ElemType* val, const size_t numBlocks, const size_t numRows, const size_t numCols)
+{
+    if (!OwnBuffer())
+        LogicError("Cannot modify since the buffer is managed externally.");
+
+    SetFormat(matrixFormatSparseBlockCol);
+    Resize(numRows, numCols, numBlocks * numRows);
+    SetBlockSize(numBlocks);
+
+    memcpy(GetBlockIds(), blockIds, sizeof(size_t)*(numBlocks));
+    memcpy(Data(), val, sizeof(ElemType)*numBlocks*numRows);
+}
+
+template <class ElemType>
 ElemType* CPUSparseMatrix<ElemType>::Data()  const
 {
     return (Buffer() + 
@@ -1078,6 +1092,106 @@ void CPUSparseMatrix<ElemType>::ScaleAndAdd(const ElemType alpha, const CPUSpars
     else
     {
         RuntimeError("CPUSparseMatrix:: ScaleAndAdd() Not implemented");
+    }
+}
+
+// c = alpha * c + lhs
+template <class ElemType>
+void CPUSparseMatrix<ElemType>::ScaleAndAccumulate(const ElemType alpha, CPUSparseMatrix<ElemType>& c, const CPUSparseMatrix<ElemType>& lhs)
+{
+    if (lhs.IsEmpty() || c.IsEmpty())
+    {
+        LogicError("ScaleAndAdd:  one of the input matrix is empty.");
+    }
+
+    if (lhs.GetNumRows() != c.GetNumRows() || lhs.GetNumCols() != c.GetNumCols())
+    {
+        InvalidArgument("CPUSparseMatrix::ScaleAndAdd: The dimensions of a and b must match.");
+    }
+
+    if (lhs.GetFormat() != MatrixFormat::matrixFormatSparseBlockCol || c.GetFormat() != MatrixFormat::matrixFormatSparseBlockCol)
+    {
+        NOT_IMPLEMENTED;
+    }
+
+    if (alpha == 0)
+    {
+        c.SetValue(lhs);
+        return;
+    }
+
+    const size_t NO_STORAGE_ID = SIZE_MAX;
+    std::map<size_t, std::pair<size_t, size_t>> cMap; // block id -> (storage id, lhs storage id)
+    for (size_t i = 0; i < c.GetBlockSize(); i++)
+    {
+        cMap.insert(std::pair<size_t, std::pair<size_t, size_t>>(c.GetBlockIds()[i], std::pair<size_t, size_t>(i, NO_STORAGE_ID)));
+    }
+
+    size_t oldBlockSize = cMap.size();
+
+    for (size_t i = 0; i < lhs.GetBlockSize(); i++)
+    {
+        size_t blockId = lhs.GetBlockIds()[i];
+        auto iter = cMap.find(blockId);
+        if (iter == cMap.end())
+        {
+            cMap.insert(std::pair<size_t, std::pair<size_t, size_t>>(blockId, std::pair<size_t, size_t>(oldBlockSize + i, i)));
+        }
+        else
+        {
+            iter->second.second = i;
+        }
+    }
+
+    //c = c * alpha;
+    ElemType* data = c.GetBlockValuePtr(0);
+    if (alpha != 1)
+    {
+        #pragma omp parallel for
+        for (int i = 0; i < (int)(oldBlockSize * c.GetNumRows()); ++i)
+        {
+            data[i] *= alpha;
+        }
+    }
+
+    // c += lhs, needs to allocate additional memory
+    size_t newBlockSize = cMap.size();
+    if (newBlockSize > oldBlockSize)
+    {
+        c.RequireSizeAndAllocate(c.GetNumRows(), c.GetNumCols(), newBlockSize * c.GetNumCols(), true, true);
+        c.SetBlockSize(newBlockSize);
+    }
+
+    #pragma omp parallel
+    {
+        size_t ompCount = 0;
+        int ompThread = omp_get_thread_num();
+        int numOmpThreads = omp_get_num_threads();
+        for (auto iter : cMap)
+        {
+            if (ompCount % numOmpThreads != ompThread) continue;
+
+            size_t blockId = iter.first;
+            size_t cStorageIndex = iter.second.first;
+            size_t lhsStorageIndex = iter.second.second;
+            if (lhsStorageIndex == NO_STORAGE_ID) continue;
+
+            const ElemType* pLhs = lhs.GetBlockValuePtr(lhsStorageIndex);
+            ElemType* p = c.GetBlockValuePtr(cStorageIndex);
+
+            if (cStorageIndex < oldBlockSize)
+            {
+                for (size_t row = 0; row < c.GetNumRows(); ++row)
+                {
+                    p[row] += pLhs[row];
+                }
+            }
+            else
+            {
+                memcpy(p, pLhs, c.GetNumRows() * sizeof(ElemType));
+                c.GetBlockIds()[cStorageIndex] = blockId;
+            }
+        }
     }
 }
 

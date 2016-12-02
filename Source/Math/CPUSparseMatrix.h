@@ -118,6 +118,8 @@ public:
     void SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYPE* h_CSCCol, const CPUSPARSE_INDEX_TYPE* h_Row, const ElemType* h_Val,
                                 const size_t nz, const size_t numRows, const size_t numCols);
 
+    void SetMatrixFromSBCFormat(const size_t* blockIds, const ElemType* val, const size_t numBlocks, const size_t numRows, const size_t numCols);
+
     // Dense * Sparse -> Dense
     static void MultiplyAndWeightedAdd(ElemType alpha, const CPUMatrix<ElemType>& lhs, const bool transposeA,
                                        const CPUSparseMatrix<ElemType>& rhs, const bool transposeB, ElemType beta, CPUMatrix<ElemType>& c);
@@ -131,6 +133,8 @@ public:
                                const CPUSparseMatrix<ElemType>& rhs, const bool transposeB, CPUSparseMatrix<ElemType>& c);
 
     static void ScaleAndAdd(const ElemType alpha, const CPUSparseMatrix<ElemType>& lhs, CPUMatrix<ElemType>& c);
+
+    static void ScaleAndAccumulate(const ElemType alpha, CPUSparseMatrix<ElemType>& c, const CPUSparseMatrix<ElemType>& lhs);
 
     static bool AreEqual(const CPUSparseMatrix<ElemType>& a, const CPUSparseMatrix<ElemType>& b, const ElemType threshold = 1e-8);
 
@@ -201,10 +205,19 @@ public:
 
             return 0;
         }
-        else
+        else if (GetFormat() == MatrixFormat::matrixFormatSparseBlockCol)
         {
-            NOT_IMPLEMENTED;
+            for (size_t p = 0; p < GetBlockSize(); p++)
+            {
+                size_t blockCol = GetBlockIds()[p] - GetBlockIdShift();
+                if (blockCol == col)
+                {
+                    return ((ElemType*)Buffer())[p * GetNumRows() + row];
+                }
+            }
+            return 0;
         }
+        NOT_IMPLEMENTED;
     }
 
 public:
@@ -256,6 +269,11 @@ public:
     void SetBlockSize(size_t newBlockSize)
     {
         BaseMatrix<ElemType>::SetBlockSize(newBlockSize);
+    }
+
+    size_t BlockSize() const
+    {
+        return BaseMatrix<ElemType>::GetBlockSize();
     }
 
     size_t* BlockIdsLocation() const
@@ -326,6 +344,16 @@ public:
         return (GetFormat() & matrixFormatRowMajor) ? MajorIndexSize() : SecondaryIndexSize();
     } // actual number of bytes in use
 
+    // get block value for storage index
+    const ElemType* GetBlockValuePtr(size_t i) const
+    {
+        return (ElemType*)Buffer() + i * GetNumRows();
+    }
+
+    ElemType* GetBlockValuePtr(size_t i)
+    {
+        return (ElemType*)Buffer() + i * GetNumRows();
+    }
 };
 
 typedef CPUSparseMatrix<float> CPUSingleSparseMatrix;
