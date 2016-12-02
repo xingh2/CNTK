@@ -330,7 +330,7 @@ ReduceMax               = CNTK2.ReduceMax
 
 Round                   = CNTK2.Round
 Sigmoid                 = CNTK2.Sigmoid
-Tree                    = CNTK2.Tree
+
 ##############################################################################
 # ComputationNodes
 ##############################################################################
