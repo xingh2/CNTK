@@ -271,7 +271,7 @@ public:
         BaseMatrix<ElemType>::SetBlockSize(newBlockSize);
     }
 
-    size_t BlockSize() const
+    size_t GetBlockSize() const
     {
         return BaseMatrix<ElemType>::GetBlockSize();
     }

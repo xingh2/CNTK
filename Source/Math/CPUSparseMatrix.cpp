@@ -253,16 +253,17 @@ void CPUSparseMatrix<ElemType>::SetValue(const CPUSparseMatrix<ElemType>& v)
 
     if (nz > 0)
     {
-        memcpy(NzValues(),    v.NzValues(),    v.NzSize());
+        memcpy(NzValues(),    v.NzValues(),    v.NzSize() * sizeof(ElemType));
 
         if ((matrixFormat == matrixFormatSparseCSC) || (matrixFormat == matrixFormatSparseCSR))
         {
-            memcpy(RowLocation(), v.RowLocation(), v.RowSize());
-            memcpy(ColLocation(), v.ColLocation(), v.ColSize());
+            memcpy(RowLocation(), v.RowLocation(), v.RowSize() * sizeof(CPUSPARSE_INDEX_TYPE));
+            memcpy(ColLocation(), v.ColLocation(), v.ColSize() * sizeof(CPUSPARSE_INDEX_TYPE));
         }
         else
         {
-            memcpy(GetBlockIds(), v.GetBlockIds(), v.GetBlockSize());
+            memcpy(GetBlockIds(), v.GetBlockIds(), v.GetBlockSize() * sizeof(size_t)); // TODO: change block id from size_t to CPUSPARSE_INDEX_TYPE
+            SetBlockSize(v.GetBlockSize());
         }
     }
     if (v.m_sliceViewOffset > 0)
@@ -986,6 +987,10 @@ void CPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const CPUMatrix<E
 
         // allocate enough memory
         c.SetFormat(matrixFormatSparseBlockCol);
+
+        // BUGBUG: original value in c is discarded if reallocate
+        // it cannot be fixed by reserve value because block id map
+        // below only accounts for rhs but not c itself
         c.RequireSizeAndAllocate(m, n, m * min(n, rhs.NzCount()), true, false);
 
         map<size_t, size_t> w2Id;
@@ -1114,7 +1119,7 @@ void CPUSparseMatrix<ElemType>::ScaleAndAccumulate(const ElemType alpha, CPUSpar
         NOT_IMPLEMENTED;
     }
 
-    if (alpha == 0)
+    if (alpha == 0 || c.GetBlockSize() == 0)
     {
         c.SetValue(lhs);
         return;
@@ -1129,13 +1134,14 @@ void CPUSparseMatrix<ElemType>::ScaleAndAccumulate(const ElemType alpha, CPUSpar
 
     size_t oldBlockSize = cMap.size();
 
+    size_t blockCount = oldBlockSize;
     for (size_t i = 0; i < lhs.GetBlockSize(); i++)
     {
         size_t blockId = lhs.GetBlockIds()[i];
         auto iter = cMap.find(blockId);
         if (iter == cMap.end())
         {
-            cMap.insert(std::pair<size_t, std::pair<size_t, size_t>>(blockId, std::pair<size_t, size_t>(oldBlockSize + i, i)));
+            cMap.insert(std::pair<size_t, std::pair<size_t, size_t>>(blockId, std::pair<size_t, size_t>(blockCount++, i)));
         }
         else
         {
@@ -1167,14 +1173,16 @@ void CPUSparseMatrix<ElemType>::ScaleAndAccumulate(const ElemType alpha, CPUSpar
         size_t ompCount = 0;
         int ompThread = omp_get_thread_num();
         int numOmpThreads = omp_get_num_threads();
-        for (auto iter : cMap)
+        for (const auto& iter : cMap)
         {
-            if (ompCount % numOmpThreads != ompThread) continue;
+            if (ompCount++ % numOmpThreads != ompThread) continue;
 
             size_t blockId = iter.first;
             size_t cStorageIndex = iter.second.first;
             size_t lhsStorageIndex = iter.second.second;
             if (lhsStorageIndex == NO_STORAGE_ID) continue;
+
+            assert(cStorageIndex < newBlockSize);
 
             const ElemType* pLhs = lhs.GetBlockValuePtr(lhsStorageIndex);
             ElemType* p = c.GetBlockValuePtr(cStorageIndex);

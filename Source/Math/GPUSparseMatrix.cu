@@ -167,7 +167,7 @@ void GPUSparseMatrix<ElemType>::SetValue(const CPUSparseMatrix<ElemType>& deepCo
     }
     else if (deepCopy.GetFormat() == matrixFormatSparseBlockCol)
     {
-        SetMatrixFromSBCFormat(deepCopy.BlockIdsLocation(), deepCopy.Data(), deepCopy.BlockSize(), deepCopy.GetNumRows(), deepCopy.GetNumCols());
+        SetMatrixFromSBCFormat(deepCopy.BlockIdsLocation(), deepCopy.Data(), deepCopy.GetBlockSize(), deepCopy.GetNumRows(), deepCopy.GetNumCols());
     }
     else
         NOT_IMPLEMENTED;
@@ -952,39 +952,32 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
 }
 
 template <class ElemType>
-void GPUSparseMatrix<ElemType>::SetMatrixFromSBCFormat(const size_t* blockIds, const ElemType* val, const size_t numBlocks, const size_t numRows, const size_t numCols,
-    const bool IsOnDevice /*= false*/, const DEVICEID_TYPE devId /*= -1*/, DataTransferer* transferer /*= nullptr*/)
+void GPUSparseMatrix<ElemType>::SetMatrixFromSBCFormat(const size_t* blockIds, const ElemType* val, const size_t numBlocks, const size_t numRows, const size_t numCols)
 {
     VerifyWritable(__FUNCTION__);
 
     if (blockIds == nullptr || val == nullptr)
         LogicError("SetMatrixFromSBCFormat: nullptr passed in.");
 
-    SetComputeDeviceId(PrepareDevice(devId));
     SetFormat(matrixFormatSparseBlockCol);
+    SetBlockSize(numBlocks);
+
+    if (numBlocks == 0) return; // ====>
 
     size_t nz = numBlocks * numRows;
     RequireSizeAndAllocate(numRows, numCols, nz, true, false);
 
-    if (transferer && IsOnDevice)
-        RuntimeError("Currently it is prohibited to copy data asynchronous from device to device.");
+    static std::vector<GPUSPARSE_INDEX_TYPE> gpuBlockIds;
+    gpuBlockIds.resize(numBlocks);
 
-    cudaMemcpyKind kind = IsOnDevice ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice;
-    if (transferer)
+    #pragma omp parallel for
+    for (int i = 0; i < numBlocks; ++i)
     {
-        // TODO: All RequireSizeAndAllocate should be async and use a transferer.
-        // Currently there are some memset operations that can be still executing on the default stream,
-        // Here we have to wait for them to finish.
-        transferer->RecordComputeStreamSyncPoint();
-        transferer->WaitForSyncPointOnAssignStreamAsync();
-        transferer->CopyCPUToGPUAsync(val, nz, sizeof(ElemType), Data());
-        transferer->CopyCPUToGPUAsync(blockIds, numBlocks, sizeof(size_t), BlockId2ColOrRow());
+        gpuBlockIds[i] = (GPUSPARSE_INDEX_TYPE)blockIds[i];
     }
-    else
-    {
-        CUDA_CALL(cudaMemcpy(Data(), val, nz * sizeof(ElemType), kind));
-        CUDA_CALL(cudaMemcpy(BlockId2ColOrRow(), blockIds, numBlocks * sizeof(size_t), kind));
-    }
+
+    CUDA_CALL(cudaMemcpy(Data(), val, nz * sizeof(ElemType), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(BlockId2ColOrRow(), &gpuBlockIds[0], numBlocks * sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyHostToDevice));
 }
 
 // this function will allocate memory while the caller needs to release it
@@ -1265,6 +1258,9 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
         size_t rhs_nz = rhs.NzCount();
         if (n * 10 < GridDim::maxThreadsPerBlock * rhs_nz)
         {
+            // BUGBUG: original value in c is discarded if reallocate
+            // it cannot be fixed by reserve value because block id map
+            // below only accounts for rhs but not c itself
             c.RequireSizeAndAllocate(m, n, 1, true, false); // reserve memory for BlockId2ColOrRow() and ColOrRow2BlockId()
 
             size_t* blockSize = TracingGPUMemoryAllocator::Allocate<size_t>(lhs.GetComputeDeviceId(), 1);
@@ -1307,6 +1303,10 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
         {
             c.SetBlockSize(rhs.IdentifyRowsWithValues());
             size_t nnz = m * c.GetBlockSize();
+
+            // BUGBUG: original value in c is discarded if reallocate
+            // it cannot be fixed by reserve value because block id map
+            // below only accounts for rhs but not c itself
             c.RequireSizeAndAllocate(m, n, nnz, true, false);
             CUDA_CALL(cudaMemset(c.Data(), 0, sizeof(ElemType) * (c.GetSizeAllocated())));
             CUDA_CALL(cudaMemset(c.BlockId2ColOrRow(), 0, sizeof(GPUSPARSE_INDEX_TYPE) * (c.GetBlockSize())));

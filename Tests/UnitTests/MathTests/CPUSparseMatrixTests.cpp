@@ -61,24 +61,39 @@ BOOST_FIXTURE_TEST_CASE(CPUSparseMatrixCopyColumnSliceToDense, RandomSeedFixture
     BOOST_CHECK(dm1.IsEqualTo(dm2, c_epsilonFloatE4));
 }
 
+#if 0 // this test is covered by GPUMatrixSuite/MatrixSparseTimesDense
 BOOST_FIXTURE_TEST_CASE(CPUSparseMatrixAdd, RandomSeedFixture)
 {
-    const size_t m = 4;
-    const size_t n = 2;
+    const size_t m = 100;
+    const size_t n = 50;
     
-    double data0[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-    DenseMatrix dm0(m, n, data0);
+    DenseMatrix dm0(m, n);
+    dm0.SetUniformRandomValue(-1, 1, IncrementCounter());
 
-    double data1[] = {0, 0, 0, 4, 0, 0, 5, 6};
-    DenseMatrix dm1(m, n, data1);
-    double val[] = {4, 5, 6};
-    int cscRow[] = {3, 2, 3};
-    int cscCol[] = {0, 1, 3};
+    DenseMatrix dm1(m, n);
+    dm1.SetUniformRandomValue(-300, 1, IncrementCounter());
+    dm1.InplaceTruncateBottom(0);
+
     SparseMatrix sm1(MatrixFormat::matrixFormatSparseCSC, m, n, 0);
-    sm1.SetMatrixFromCSCFormat(cscCol, cscRow, val, _countof(val), 4, 2);
     foreach_coord(row, col, dm1)
     {
-        BOOST_CHECK(sm1(row, col) == dm1(row, col));
+        if (dm1(row, col) != 0)
+        {
+            sm1.SetValue(row, col, dm1(row, col));
+        }
+    }
+
+    DenseMatrix dm2(m, n);
+    dm2.SetUniformRandomValue(-200, 1, IncrementCounter());
+    dm2.InplaceTruncateBottom(0);
+
+    SparseMatrix sm2(MatrixFormat::matrixFormatSparseCSC, m, n, 0);
+    foreach_coord(row, col, dm2)
+    {
+        if (dm2(row, col) != 0)
+        {
+            sm2.SetValue(row, col, dm2(row, col));
+        }
     }
 
     // generate SparseBlockCol matrix
@@ -94,10 +109,10 @@ BOOST_FIXTURE_TEST_CASE(CPUSparseMatrixAdd, RandomSeedFixture)
     }
 
     SparseMatrix smMul2(MatrixFormat::matrixFormatSparseBlockCol, m, m, 0);
-    SparseMatrix::MultiplyAndAdd(1, dm1, false, sm1, true, smMul2);
+    SparseMatrix::MultiplyAndAdd(1, dm0, false, sm2, true, smMul2);
 
     DenseMatrix dmMul2(m, m);
-    DenseMatrix::MultiplyAndAdd(dm1, false, dm1, true, dmMul2);
+    DenseMatrix::MultiplyAndAdd(dm0, false, dm2, true, dmMul2);
     foreach_coord(row, col, dmMul2)
     {
         BOOST_CHECK(smMul2(row, col) == dmMul2(row, col));
@@ -112,26 +127,25 @@ BOOST_FIXTURE_TEST_CASE(CPUSparseMatrixAdd, RandomSeedFixture)
         BOOST_CHECK(smMul2(row, col) == dmMul2(row, col));
     }
 
-    double data3[] = { 0, 0, 0, 4, 0, 0, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0 };
-    DenseMatrix dm3(m, m, data3);
-    double nzBlocks[] = { 0, 0, 0, 4, 0, 0, 5, 6 };
-    size_t blockIds[] = { 0, 1 };
-    SparseMatrix sm3(MatrixFormat::matrixFormatSparseBlockCol);
-    sm3.SetMatrixFromSBCFormat(blockIds, nzBlocks, _countof(blockIds), m, m);
-    foreach_coord(row, col, dm3)
-    {
-        BOOST_CHECK(sm3(row, col) == dm3(row, col));
-    }
+    DenseMatrix dm3(m, n);
+    dm3.SetUniformRandomValue(-300, 1, IncrementCounter());
+    dm3.SetToZeroIfAbsLessThan(0);
 
-    dmMul2 = (dmMul2 * 0.9) + dm3;
-    SparseMatrix::ScaleAndAccumulate(0.9, smMul2, sm3);
+    DenseMatrix dm4(m, m);
+    DenseMatrix::Multiply(dm3, false, dm1, true, dm4);
+
+    SparseMatrix sm4(MatrixFormat::matrixFormatSparseBlockCol);
+    SparseMatrix::MultiplyAndAdd(1, dm3, false, sm1, true, sm4);
+
+    dmMul2 = (dmMul2 * 0.9) + dm4;
+    SparseMatrix::ScaleAndAccumulate(0.9, smMul2, sm4);
 
     foreach_coord(row, col, dmMul2)
     {
         BOOST_CHECK(smMul2(row, col) == dmMul2(row, col));
     }
 }
-
+#endif
 BOOST_AUTO_TEST_SUITE_END()
 }
 } } }
